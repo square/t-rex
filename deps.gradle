@@ -1,0 +1,137 @@
+/*
+ * This file is purely to track dependencies. The actual build is in
+ * the Makefile.
+ */
+
+apply plugin: 'java'
+
+// The repositories to try to read from
+repositories {
+  // Global maven
+  mavenCentral()
+}
+
+configurations {
+  compile {
+    resolutionStrategy.activateDependencyLocking()
+  }
+  testCompile  {
+    resolutionStrategy.activateDependencyLocking()
+  }
+}
+
+/**
+ * A helper function for copying a set of dependencies over to a
+ * particular folder. See the task copyDependencies.
+ * The use-case for this function, as opposed to the standard Copy function in
+ * Gradle, is to allow the target path to be the fully-qualified dependency
+ * name. This avoids conflicts in the Square repo, where there are multiple
+ * dependencies with the name `annotations` and the same version, which would
+ * clobber each other.
+ *
+ * @param dependencies The list of dependencies we would like to copy over.
+ * @param targetDir The directory we're outputting the dependencies into. This
+ *                  should be a directory. Dependencies will be hard linked
+ *                  into this directory, if possible
+ */
+void copyDependenciesToFolder(dependencies, targetDir) {
+  // The file names (without the leading targetDir) to all the dependencies.
+  // We use this to remove any file not in the dependency list.
+  def allTargets = new HashSet<String>()
+  def librariesAdded = 0
+  dependencies.each { dep ->
+    // Metadata about the dependency
+    def depId = dep.getModuleVersion().getId()
+    // The location of the dependency in Gradle's local cache
+    def sourcePath = dep.getFile().getAbsolutePath()
+    // The path we'd like to save the dependency into
+    def targetFilename = depId.group + '_' + depId.name + '_' + depId.version + '.jar'
+    def targetPath = System.getProperty("user.dir") + File.separator + targetDir + File.separator + targetFilename
+    // In rare cases, a dependency has no implementing jar. Skip these
+    if (sourcePath.endsWith('.pom')) {
+      println 'Skipping dependency ' + targetFilename + ' since it has no associated jar'
+    } else {
+      // Register the target
+      allTargets.add(targetFilename)
+      // Try to hard link the dependency. If that doesn't work, copy it.
+      if (!new File(targetPath).exists()) {
+        librariesAdded += 1
+        try {
+          java.nio.file.Files.createLink(
+            java.nio.file.Path.of(targetPath),
+            java.nio.file.Path.of(sourcePath))
+        } catch (UnsupportedOperationException e) {
+          java.nio.file.Files.copy(
+            java.nio.file.Path.of(sourcePath),
+            java.nio.file.Path.of(targetPath),
+            java.nio.file.StandardCopyOptions.REPLACE_EXISTING)
+        }
+      }
+    }
+  }
+  println 'Added ' + librariesAdded + " dependencies into $targetDir"
+
+  // Clean up files that aren't in the dependency list
+  new File(targetDir).list().each { existingFilename ->
+    if (!allTargets.contains(existingFilename)) {
+      println "Cleaning up old library $targetDir/$existingFilename"
+      new File(targetDir + File.separator + existingFilename).delete()
+    }
+  }
+}
+
+/**
+ * A task to copy all the dependencies defined below into the folders lib/java/main
+ * and lib/java/test. The dependencies in lib/java/test will only contain the extra
+ * dependencies not already present in lib/java/main. If there would have been a
+ * version conflict between compile and test compile dependencies, this ensures
+ * that the compile dependency version is taken.
+ *
+ * Usage (though most commonly this is invoked via the Makefile):
+ *
+ *    gradle -b deps.gradle copyDependencies
+ */
+task copyDependencies {
+  doLast {
+    // The magic lines below run Gradles dependency resolution magic
+    def compileDeps = configurations.compile.getResolvedConfiguration().getResolvedArtifacts()
+    def allTestDeps = configurations.testCompile.getResolvedConfiguration().getResolvedArtifacts()
+
+    // Remove test modules that already exist in compile
+    def compileDepNames = new HashSet<String>()
+    compileDeps.each { dep ->
+      compileDepNames.add(dep.getModuleVersion().getId().group + ':' + dep.getModuleVersion().getId().name)
+    }
+    def testDeps = allTestDeps.findAll { dep ->
+      def name = dep.getModuleVersion().getId().group + ':' + dep.getModuleVersion().getId().name
+      return !compileDepNames.contains(name)
+    }
+
+    // Copy the appropriate dependencies
+    copyDependenciesToFolder(compileDeps, 'lib/java/main')
+    copyDependenciesToFolder(testDeps, 'lib/java/test')
+
+  }
+}
+
+/*
+ * The dependencies for T-Rex. When adding new dependencies, make sure
+ * to add to associated dependencies to pom.xml, so that the public
+ * releases compile.
+ */
+dependencies {
+  // Antlr -- for parsing regular grammars (i.e., the regex grammar)
+  compile 'org.antlr:antlr4-runtime:4.9.3'
+
+  // CoreNLP -- for matching against CoreLabels
+  // This is not strictly necessary at runtime, but is often used
+  // since we are often matching against CoreNLP tokens.
+  compile group: 'edu.stanford.nlp', name: 'stanford-corenlp', version: '4.4.0'
+  
+  // Jupiter (Junit 5) for testing
+  testCompile 'org.junit.jupiter:junit-jupiter-api:5.7.2'
+  testCompile 'org.junit.platform:junit-platform-console-standalone:1.7.2'
+  
+  // Logging -- for unit tests only
+  testCompile 'org.slf4j:slf4j-simple:2.0.0-alpha6'
+}

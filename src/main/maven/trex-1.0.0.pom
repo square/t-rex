@@ -1,0 +1,79 @@
+<!--
+  The POM file for Maven deployments.
+  This should not be used to build the project.
+  The canonical way to build and test the T-Rex codebase is via the Makefile.
+  There are a few motivations for this:
+    1. Codegen is more interpretable using Make than using Maven plugins
+    2. Cross-language compilation is more interpretable if a common build system is
+       used (i.e., make) versus language-specific tools
+
+  Reach out to Gabor Angeli (gabor@squareup.com) for questions about deployment.
+-->
+<project>
+  <!-- Maven Boilerplate -->
+  <modelVersion>4.0.0</modelVersion>
+  <packaging>jar</packaging>
+
+  <!-- Project Information -->
+  <groupId>com.squareup.trex</groupId>
+  <artifactId>trex</artifactId>
+  <developers>
+    <developer>
+      <id>gabor.square</id>
+      <name>Gabor Angeli</name>
+      <email>gabor@squareup.com</email>
+      <url>https://www.linkedin.com/in/gabor-angeli-468ab6a/</url>
+      <organization>Square Inc</organization>
+      <organizationUrl>https://squareup.com/</organizationUrl>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>America/Los_Angeles</timezone>
+    </developer>
+  </developers>
+  <!--
+    DO NOT CHANGE THE FOLLOWING LINE!
+    Create a copy with the new value and change the value in the Makefile instead
+  -->
+  <version>1.0.0</version>
+  <name>T-Rex</name>
+  <description>A regex language over rich tokens</description>
+  <url>https://github.com/square/t-rex</url>
+
+  <!-- Build using Java 11 -->
+  <properties>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+  </properties>
+
+  <!-- Apache 2 license -->
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <!-- Code is hosted on GitHub -->
+  <scm>
+    <url>https://github.com/square/t-rex</url>
+  </scm>
+
+  <dependencies>
+    <!-- Needed to parse our regex grammar -->
+    <dependency>
+      <groupId>org.antlr</groupId>
+      <artifactId>antlr4-runtime</artifactId>
+      <version>[4.7,)</version>
+    </dependency>
+
+    <!-- Needed if we're running patterns over lists of CoreNLP CoreLabel objects -->
+    <dependency>
+      <groupId>edu.stanford.nlp</groupId>
+      <artifactId>stanford-corenlp</artifactId>
+      <version>[1.2.0,)</version>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+</project>
